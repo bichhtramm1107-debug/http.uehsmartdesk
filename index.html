@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UEH SmartDesk</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+:root{
+  --t:#12606a;--t2:#0c4a52;--o:#f26f21;--bg:#f2f7f7;--c:#fff;--tx:#14282b;--mu:#5d7377;--bd:#d9e5e6;--g:#1f9d55;--r:#d64545;--y:#e5a50a;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#0d1a1c;--c:#152a2d;--tx:#e8f2f3;--mu:#92abae;--bd:#27444a}
+  :root:not([data-theme="light"]) h1,:root:not([data-theme="light"]) h2,:root:not([data-theme="light"]) h3{color:#7fd0d9}
+}
+:root[data-theme="dark"]{--bg:#0d1a1c;--c:#152a2d;--tx:#e8f2f3;--mu:#92abae;--bd:#27444a}
+:root[data-theme="dark"] h1,:root[data-theme="dark"] h2,:root[data-theme="dark"] h3{color:#7fd0d9}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input{font:inherit}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+.card{background:var(--c);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:0 1px 4px #0001;margin-bottom:14px}
+.btn{background:var(--t);color:#fff;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;font-weight:600}
+.btn:hover{background:var(--t2)}.btn.o{background:var(--o)}.btn.g{background:transparent;color:var(--t);border:1px solid var(--t)}.btn.r{background:var(--r)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+input.i{width:100%;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);margin:6px 0}
+.err{color:var(--r);font-size:14px;min-height:20px}.mu{color:var(--mu);font-size:14px}
+h1,h2,h3{margin:.3em 0;color:var(--t)}
+.nav{background:var(--t);color:#fff;position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top,0px)}
+.nav .in{max-width:980px;margin:auto;display:flex;align-items:center;gap:6px;padding:8px 12px;flex-wrap:wrap}
+.nav img,.nav svg{height:36px;width:36px;border-radius:8px}.nav b{margin-right:auto}
+.nav button{background:none;border:0;color:#fff;padding:8px 10px;border-radius:8px;cursor:pointer;opacity:.85}
+.nav button.on{background:#ffffff26;opacity:1}
+.hero{background:linear-gradient(120deg,var(--t),#1a7f8b);color:#fff;border-radius:14px;padding:22px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px;overflow:hidden}
+.hero h2{color:#fff}.hero img.p,.hero svg.p{width:220px;max-width:100%;border-radius:12px;margin-left:auto;height:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.st{text-align:center}.st b{font-size:28px;display:block;color:var(--t)}
+.seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.s{border:2px solid;border-radius:10px;padding:10px 2px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;background:var(--c);color:var(--tx)}
+.s small{display:block;font-weight:400;font-size:11px}
+.free{border-color:var(--g);background:#1f9d5518}.used{border-color:var(--r);background:#d6454518}.away{border-color:var(--y);background:#e5a50a22}.mine{outline:3px solid var(--o)}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin:0 4px 0 12px}
+.tabs button{margin:0 6px 8px 0}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.modal .card{max-width:400px;width:100%;margin:0}
+.big{font-size:44px;font-weight:700;color:var(--o);text-align:center}
+video{width:100%;border-radius:12px;background:#000;max-height:50vh}
+.center{max-width:430px;margin:6vh auto}.logo{width:110px;display:block;margin:0 auto 10px}.logo svg{width:110px;height:110px;border-radius:22px;display:block}
+.badge{padding:2px 9px;border-radius:20px;font-size:12px;color:#fff;background:var(--mu)}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 18px;border-radius:10px;z-index:30;max-width:90%}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px;border-bottom:1px solid var(--bd);text-align:left}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const LIB = { lat: null, lng: null, radius: 50 }; // null = DEMO, bỏ qua GPS
+const CFG = { sessMin: 90, awayMin: 15, loginDays: 7, floors: 4, perFloor: 30 };
+const K = "ueh_smartdesk_v1";
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="24" fill="#12606a"/><text x="60" y="72" text-anchor="middle" fill="#fff" font-size="34" font-family="Segoe UI,Arial" font-weight="700">UEH</text></svg>`;
+const PHOTO_SVG = `<svg class="p" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280" role="img" aria-label="Thư viện UEH"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0c4a52"/><stop offset="1" stop-color="#1a7f8b"/></linearGradient></defs><rect width="440" height="280" rx="12" fill="url(#g)"/><rect x="36" y="48" width="368" height="184" rx="8" fill="#ffffff22"/><rect x="60" y="72" width="70" height="140" fill="#ffffff33"/><rect x="148" y="72" width="70" height="140" fill="#ffffff33"/><rect x="236" y="72" width="70" height="140" fill="#ffffff33"/><rect x="324" y="72" width="56" height="140" fill="#f26f21aa"/><text x="220" y="250" text-anchor="middle" fill="#fff" font-size="18" font-family="Segoe UI,Arial">Thư viện UEH · Cơ sở B</text></svg>`;
+
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, "0");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const seatId = (f, n) => `T${f}-${pad(n)}`;
+const floorOf = id => {
+  const m = String(id).match(/^T(\d+)-/);
+  return m ? +m[1] : 0;
+};
+
+let S = loadState();
+let view = "login";
+let floor = 1;
+let stream = null;
+let raf = 0;
+let pre = null;
+let pendingUser = null;
+let result = null;
+let msg = "";
+let busy = false;
+
+function defaultSeats() {
+  const seats = {};
+  for (let f = 1; f <= CFG.floors; f++) {
+    for (let n = 1; n <= CFG.perFloor; n++) {
+      const r = Math.random();
+      seats[seatId(f, n)] = r < 0.45
+        ? { s: "used" }
+        : r < 0.53
+          ? { s: "away", until: Date.now() + Math.random() * CFG.awayMin * 6e4 }
+          : { s: "free" };
+    }
+  }
+  return seats;
+}
+
+function init() {
+  return { user: null, seats: defaultSeats(), sess: null, hist: [], notes: [] };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(K);
+    if (!raw) return init();
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return init();
+    if (!data.seats || typeof data.seats !== "object") data.seats = defaultSeats();
+    if (!Array.isArray(data.hist)) data.hist = [];
+    if (!Array.isArray(data.notes)) data.notes = [];
+    return data;
+  } catch {
+    return init();
+  }
+}
+
+function save() {
+  try { localStorage.setItem(K, JSON.stringify(S)); }
+  catch { toast("Không lưu được dữ liệu trình duyệt (hết dung lượng hoặc chế độ riêng tư)."); }
+}
+
+function note(t) {
+  S.notes.unshift({ t, at: Date.now() });
+  save();
+}
+
+function toast(t) {
+  const e = document.createElement("div");
+  e.className = "toast";
+  e.textContent = t;
+  document.body.append(e);
+  setTimeout(() => e.remove(), 3500);
+}
+
+function fmt(ms) {
+  ms = Math.max(0, ms);
+  const s = Math.ceil(ms / 1e3);
+  return pad(Math.floor(s / 60)) + ":" + pad(s % 60);
+}
+
+function dt(t) {
+  return new Date(t).toLocaleString("vi-VN");
+}
+
+function logoHtml() {
+  return `<span class="logo">${LOGO_SVG}</span>`;
+}
+
+function parseId(v) {
+  v = v.trim().toLowerCase();
+  if (/^\d+$/.test(v)) return v.length === 11 ? { mssv: v } : { e: "Mã số sinh viên phải gồm đúng 11 chữ số." };
+  if (v.includes("@")) {
+    if (!/^[^\s@]+@st\.ueh\.edu\.vn$/.test(v)) return { e: "Email phải đúng định dạng và kết thúc bằng @st.ueh.edu.vn." };
+    const m = v.match(/(\d{11})@/);
+    return { email: v, mssv: m ? m[1] : "" };
+  }
+  return { e: "Nhập mã số sinh viên (11 chữ số) hoặc email @st.ueh.edu.vn." };
+}
+
+function doLogin() {
+  const err = $("#err");
+  const r = parseId($("#id").value);
+  const p = $("#pw").value;
+  if (r.e) return err.textContent = r.e;
+  if (!p) return err.textContent = "Vui lòng nhập mật khẩu (bản demo chấp nhận mật khẩu bất kỳ).";
+  pendingUser = r;
+  view = "confirm";
+  render();
+}
+
+function confirmUser() {
+  S.user = { ...pendingUser, exp: Date.now() + CFG.loginDays * 864e5 };
+  pendingUser = null;
+  if (!S.notes.length) note("Chào mừng bạn đến với UEH SmartDesk!");
+  save();
+  view = "home";
+  render();
+}
+
+function resume() {
+  if (S.user && S.user.exp > Date.now()) {
+    view = "home";
+    render();
+  } else {
+    S.user = null;
+    save();
+    view = "expired";
+    render();
+  }
+}
+
+function logout() {
+  if (!confirm("Bạn muốn đăng xuất?")) return;
+  S.user = null;
+  pendingUser = null;
+  save();
+  view = "login";
+  render();
+}
+
+function switchAcc() {
+  S.user = null;
+  pendingUser = null;
+  save();
+  view = "login";
+  render();
+}
+
+function cnt() {
+  const a = Object.values(S.seats);
+  return {
+    t: a.length,
+    f: a.filter(x => x.s === "free").length,
+    u: a.filter(x => x.s === "used").length,
+    a: a.filter(x => x.s === "away").length
+  };
+}
+
+function release(id, why) {
+  const q = S.sess;
+  S.seats[id] = { s: "free" };
+  if (q && q.seat === id) {
+    S.hist.unshift({ seat: id, start: q.start, end: Date.now(), st: why });
+    S.sess = null;
+  }
+  note(
+    why === "Hết giờ tạm vắng"
+      ? `Chỗ ${id} đã được giải phóng do quá ${CFG.awayMin} phút tạm vắng.`
+      : why === "Hết thời gian"
+        ? `Phiên tại ${id} đã hết thời gian.`
+        : `Bạn đã kết thúc sử dụng chỗ ${id}.`
+  );
+  save();
+}
+
+function away() {
+  const q = S.sess;
+  if (!q) return;
+  if (!confirm(`Tạm vắng ${CFG.awayMin} phút? Quá hạn chỗ sẽ được giải phóng.`)) return;
+  if (q.away) return;
+  q.away = Date.now() + CFG.awayMin * 6e4;
+  S.seats[q.seat] = { s: "away", until: q.away, me: 1 };
+  note(`Bắt đầu tạm vắng tại ${q.seat}.`);
+  save();
+  render();
+}
+
+function back() {
+  const q = S.sess;
+  if (!q) return;
+  q.away = null;
+  S.seats[q.seat] = { s: "used", me: 1 };
+  note("Bạn đã quay lại chỗ ngồi.");
+  save();
+  render();
+}
+
+function endSess() {
+  if (!S.sess) return;
+  if (!confirm("Kết thúc sử dụng chỗ ngồi?")) return;
+  release(S.sess.seat, "Hoàn thành");
+  view = "mine";
+  render();
+}
+
+function tick() {
+  let ch = 0;
+  const q = S.sess;
+  const n = Date.now();
+  for (const [k, v] of Object.entries(S.seats)) {
+    if (v.s === "away" && !v.me && v.until < n) {
+      S.seats[k] = { s: "free" };
+      ch = 1;
+    }
+  }
+  if (q) {
+    if (q.away && n >= q.away) {
+      release(q.seat, "Hết giờ tạm vắng");
+      toast("Chỗ của bạn đã bị giải phóng.");
+      ch = 1;
+    } else if (n >= q.end) {
+      release(q.seat, "Hết thời gian");
+      ch = 1;
+    }
+  }
+  if (ch) save();
+
+  const left = $("#leftTime");
+  if (left && S.sess) {
+    left.textContent = S.sess.away ? fmt(S.sess.away - Date.now()) : fmt(S.sess.end - Date.now());
+  }
+  const needView = S.user && ["mine", "map", "home"].includes(view) && !document.querySelector(".modal");
+  if (ch && needView) render();
+}
+
+setInterval(tick, 1000);
+
+function hav(a, b, c, d) {
+  const R = 6371e3, r = x => x * Math.PI / 180;
+  const A = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(A));
+}
+
+function handleCode(raw) {
+  if (busy) return;
+  busy = true;
+  stopCam();
+  const m = String(raw).trim().toUpperCase().match(/^UEHSD:(T\d+-\d{2})$/);
+  if (!m || !S.seats[m[1]]) {
+    busy = false;
+    return fail("Mã QR không hợp lệ.");
+  }
+  const id = m[1], st = S.seats[id];
+  if (S.sess) { busy = false; return fail("Bạn đang sử dụng một chỗ. Hãy kết thúc trước khi nhận chỗ mới."); }
+  if (pre && pre !== id) { busy = false; return fail(`Mã QR là chỗ ${id}, không trùng chỗ bạn đã chọn (${pre}).`); }
+  if (st.s !== "free") { busy = false; return fail("Chỗ này đang có người sử dụng."); }
+  if (LIB.lat == null) {
+    busy = false;
+    return done(id, "(DEMO: chưa cấu hình tọa độ nên bỏ qua kiểm tra GPS)");
+  }
+  if (!navigator.geolocation) { busy = false; return fail("Thiết bị không hỗ trợ định vị."); }
+  msg = "Đang xác định vị trí...";
+  render();
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      busy = false;
+      const d = hav(p.coords.latitude, p.coords.longitude, LIB.lat, LIB.lng);
+      d <= LIB.radius ? done(id, "") : fail("Bạn đang ở ngoài phạm vi cho phép. Hãy đến Thư viện UEH Cơ sở B để nhận chỗ.");
+    },
+    e => {
+      busy = false;
+      fail(e.code === 1
+        ? "Bạn đã từ chối quyền vị trí. Hãy bật quyền vị trí trong cài đặt trình duyệt hoặc liên hệ nhân viên thư viện để xác minh thay thế."
+        : "Không xác định được vị trí (tín hiệu yếu). Hãy thử lại ở nơi thoáng hơn.");
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function done(id, x) {
+  const n = Date.now();
+  S.seats[id] = { s: "used", me: 1 };
+  S.sess = { seat: id, start: n, end: n + CFG.sessMin * 6e4, away: null };
+  note(`Check-in thành công tại ${id}.`);
+  save();
+  pre = null;
+  msg = "";
+  view = "result";
+  result = { ok: 1, t: "Check-in thành công! Chỗ ngồi đã được ghi nhận cho tài khoản của bạn. " + x };
+  render();
+}
+
+function fail(t) {
+  msg = "";
+  view = "result";
+  result = { ok: 0, t };
+  render();
+}
+
+async function startCam() {
+  const err = $("#camErr");
+  if (typeof jsQR !== "function") {
+    if (err) err.textContent = "Không tải được thư viện quét QR. Hãy nhập mã thủ công hoặc tải lại trang (cần mạng).";
+    return;
+  }
+  const v = $("#vid");
+  if (!v) return;
+  try {
+    stopCam();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    v.srcObject = stream;
+    await v.play();
+    const c = document.createElement("canvas");
+    const x = c.getContext("2d", { willReadFrequently: true });
+    (function loop() {
+      if (!stream) return;
+      if (v.readyState >= 2 && v.videoWidth) {
+        c.width = v.videoWidth;
+        c.height = v.videoHeight;
+        x.drawImage(v, 0, 0);
+        const r = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+        if (r && r.data) return handleCode(r.data);
+      }
+      raf = requestAnimationFrame(loop);
+    })();
+  } catch {
+    if (err) err.textContent = "Không mở được camera: hãy cấp quyền camera hoặc nhập mã thủ công bên dưới.";
+  }
+}
+
+function stopCam() {
+  cancelAnimationFrame(raf);
+  raf = 0;
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+}
+
+function go(v, p) {
+  stopCam();
+  view = v;
+  if (v === "scan") pre = p === undefined ? pre : p;
+  else if (v !== "result") pre = v === "map" ? pre : null;
+  document.querySelector(".modal")?.remove();
+  render();
+  scrollTo(0, 0);
+}
+
+function nav() {
+  const t = [
+    ["home", "Trang chủ"],
+    ["map", "Sơ đồ"],
+    ["mine", "Chỗ của tôi"],
+    ["hist", "Lịch sử"],
+    ["notes", "Thông báo" + (S.notes.length ? ` (${S.notes.length})` : "")],
+    ["profile", "Tài khoản"]
+  ];
+  return `<div class="nav"><div class="in">${LOGO_SVG.replace("<svg ", '<svg height="36" width="36" ')}<b>UEH SmartDesk</b>${t.map(([k, l]) => `<button type="button" class="${view === k ? "on" : ""}" onclick="go('${k}')">${esc(l)}</button>`).join("")}</div></div>`;
+}
+
+const V = {
+  login: () => `<div class="center card">${logoHtml()}<h2 style="text-align:center">Chào mừng bạn đến với UEH SmartDesk</h2>
+<p class="mu" style="text-align:center">Đăng nhập bằng tài khoản sinh viên UEH để tìm và quản lý chỗ ngồi tại thư viện</p>
+<input class="i" id="id" placeholder="MSSV (11 chữ số) hoặc email @st.ueh.edu.vn" autocomplete="username">
+<input class="i" id="pw" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+<div class="err" id="err"></div><button type="button" class="btn" style="width:100%" onclick="doLogin()">Đăng nhập</button>
+<p class="mu" style="text-align:center">Không thể đăng nhập? Liên hệ quầy "Ask Us Now" tại thư viện.<br><b>Bản DEMO:</b> mật khẩu bất kỳ đều được chấp nhận.</p></div>`,
+
+  confirm: () => {
+    const u = pendingUser || S.user || {};
+    return `<div class="center card">${logoHtml()}<h2 style="text-align:center">Xác nhận tài khoản của bạn</h2>
+<p><b>MSSV:</b> ${esc(u.mssv || "(không có trong email)")}<br><b>Email UEH:</b> ${esc(u.email || "—")}<br><b>Tên:</b> <span class="mu">chưa có dữ liệu từ hệ thống xác thực</span><br><b>Trạng thái:</b> <span class="badge" style="background:var(--g)">Đang hoạt động (demo)</span></p>
+<button type="button" class="btn" style="width:100%;margin-bottom:8px" onclick="${pendingUser ? "confirmUser()" : "resume()"}">Tiếp tục</button>
+<button type="button" class="btn g" style="width:100%" onclick="switchAcc()">Đổi tài khoản</button></div>`;
+  },
+
+  expired: () => `<div class="center card">${logoHtml()}<h2 style="text-align:center">Phiên đăng nhập đã hết hạn</h2><p class="mu" style="text-align:center">Vì lý do bảo mật, vui lòng đăng nhập lại.</p><button type="button" class="btn" style="width:100%" onclick="go('login')">Đăng nhập lại</button></div>`,
+
+  home: () => {
+    const c = cnt();
+    const name = esc(S.user.mssv || S.user.email);
+    return `<div class="hero"><div><h2>Xin chào, ${name}</h2><div>Thư viện UEH Cơ sở B · Smart Library</div></div>${PHOTO_SVG}</div>
+<div class="grid">${[["Tổng chỗ", c.t], ["Đang trống", c.f], ["Đang dùng", c.u], ["Tạm vắng", c.a]].map(([l, v]) => `<div class="card st"><b>${v}</b>${l}</div>`).join("")}</div>
+<p class="mu">Số liệu minh họa (dữ liệu DEMO lưu trên trình duyệt).</p>
+<div class="grid"><button type="button" class="btn o" onclick="go('map')">Tìm chỗ ngay</button><button type="button" class="btn" onclick="go('scan',null)">Quét QR để nhận chỗ</button><button type="button" class="btn g" onclick="go('mine')">Chỗ ngồi của tôi</button><button type="button" class="btn g" onclick="go('guide')">Hướng dẫn sử dụng</button></div>`;
+  },
+
+  map: () => `<h2>Sơ đồ chỗ ngồi</h2><div class="tabs">${Array.from({ length: CFG.floors }, (_, i) => `<button type="button" class="btn ${floor === i + 1 ? "" : "g"}" onclick="setFloor(${i + 1})">Tầng ${i + 1}</button>`).join("")}</div>
+<div class="mu"><span class="dot" style="background:var(--g);margin-left:0"></span>Trống<span class="dot" style="background:var(--r)"></span>Đang dùng<span class="dot" style="background:var(--y)"></span>Tạm vắng</div><br>
+<div class="seats">${Object.entries(S.seats).filter(([k]) => k.startsWith("T" + floor + "-")).map(([k, v]) => `<div class="s ${v.s} ${v.me ? "mine" : ""}" onclick="seatInfo('${k}')">${esc(k.slice(k.indexOf("-") + 1))}<small>${{ free: "Trống", used: "Đang dùng", away: "Tạm vắng" }[v.s]}</small></div>`).join("")}</div>`,
+
+  scan: () => `<h2>Quét QR nhận chỗ</h2>${pre ? `<p>Chỗ đã chọn: <b>${esc(pre)}</b></p>` : ""}<div class="card"><video id="vid" playsinline muted></video><div class="err" id="camErr"></div>
+<button type="button" class="btn" onclick="startCam()">Mở camera</button> <button type="button" class="btn g" onclick="go('map')">Quay lại</button>
+<p class="mu">${esc(msg || "Camera và vị trí chỉ được yêu cầu khi bạn check-in. Vị trí dùng để xác nhận bạn đang ở trong bán kính 50 m của thư viện.")}</p></div>
+<div class="card"><b>Nhập mã thủ công (dùng để thử)</b><input class="i" id="man" placeholder="Ví dụ: UEHSD:T1-05"><button type="button" class="btn g" onclick="handleCode($('#man').value)">Xác nhận mã</button></div>`,
+
+  result: () => {
+    const r = result || { ok: 0, t: "Không có kết quả." };
+    return `<div class="center card" style="text-align:center"><div style="font-size:54px">${r.ok ? "✅" : "❌"}</div><h2>${r.ok ? "Thành công" : "Không thành công"}</h2><p>${esc(r.t)}</p><button type="button" class="btn" onclick="go('${r.ok ? "mine" : "map"}')">${r.ok ? "Xem chỗ của tôi" : "Quay lại"}</button></div>`;
+  },
+
+  mine: () => {
+    const q = S.sess;
+    if (!q) return `<div class="card" style="text-align:center"><h2>Bạn chưa nhận chỗ</h2><button type="button" class="btn o" onclick="go('map')">Tìm chỗ ngay</button></div>`;
+    const f = floorOf(q.seat);
+    return `<h2>Chỗ ngồi của tôi</h2><div class="card"><h2>${esc(q.seat)} <span class="badge" style="background:${q.away ? "var(--y)" : "var(--g)"}">${q.away ? "Tạm vắng" : "Đang sử dụng"}</span></h2>
+<p>Tầng ${f} · Check-in: ${esc(dt(q.start))}<br>Kết thúc dự kiến: ${esc(dt(q.end))}</p>
+${q.away
+  ? `<div class="mu">Thời gian tạm vắng còn lại</div><div class="big" id="leftTime">${fmt(q.away - Date.now())}</div><button type="button" class="btn" onclick="back()">Tôi đã quay lại</button>`
+  : `<div class="mu">Thời gian còn lại</div><div class="big" id="leftTime">${fmt(q.end - Date.now())}</div><button type="button" class="btn o" onclick="away()">Tạm vắng ${CFG.awayMin} phút</button>`}
+ <button type="button" class="btn r" onclick="endSess()">Kết thúc sử dụng</button></div>`;
+  },
+
+  hist: () => `<h2>Lịch sử sử dụng</h2><div class="card">${S.hist.length ? `<table><tr><th>Ngày</th><th>Chỗ</th><th>Bắt đầu</th><th>Kết thúc</th><th>Trạng thái</th></tr>${S.hist.map(h => `<tr><td>${esc(new Date(h.start).toLocaleDateString("vi-VN"))}</td><td>${esc(h.seat)}</td><td>${esc(new Date(h.start).toLocaleTimeString("vi-VN"))}</td><td>${esc(new Date(h.end).toLocaleTimeString("vi-VN"))}</td><td>${esc(h.st)}</td></tr>`).join("")}</table>` : `<p class="mu">Chưa có dữ liệu sử dụng.</p>`}</div>`,
+
+  notes: () => `<h2>Thông báo</h2><div class="card">${S.notes.length ? S.notes.map(n => `<p>🔔 ${esc(n.t)}<br><span class="mu">${esc(dt(n.at))}</span></p>`).join("") : `<p class="mu">Không có thông báo.</p>`}</div>`,
+
+  profile: () => `<h2>Hồ sơ tài khoản</h2><div class="card"><p><b>MSSV:</b> ${esc(S.user.mssv || "—")}<br><b>Email:</b> ${esc(S.user.email || "—")}<br><b>Phiên hết hạn:</b> ${esc(dt(S.user.exp))}</p>
+<button type="button" class="btn g" onclick="switchAcc()">Đổi tài khoản</button> <button type="button" class="btn r" onclick="logout()">Đăng xuất</button> <button type="button" class="btn g" onclick="resetDemo()">Đặt lại dữ liệu demo</button></div>`,
+
+  guide: () => `<h2>Hướng dẫn sử dụng</h2><div class="card"><ol><li>Vào <b>Sơ đồ</b>, chọn tầng và một chỗ màu xanh.</li><li>Bấm <b>Nhận chỗ</b>, quét QR gắn trên bàn (định dạng <code>UEHSD:T1-05</code>).</li><li>Cho phép vị trí để xác nhận bạn đang ở thư viện (≤ 50 m).</li><li>Cần rời chỗ ngắn? Bấm <b>Tạm vắng ${CFG.awayMin} phút</b>, nhớ bấm "Tôi đã quay lại".</li><li>Khi xong, bấm <b>Kết thúc sử dụng</b>.</li></ol></div>`
+};
+
+function setFloor(n) {
+  floor = n;
+  render();
+}
+
+function resetDemo() {
+  if (!confirm("Xóa toàn bộ dữ liệu demo?")) return;
+  localStorage.removeItem(K);
+  location.reload();
+}
+
+function seatInfo(id) {
+  const v = S.seats[id];
+  if (!v) return;
+  const m = document.createElement("div");
+  m.className = "modal";
+  m.onclick = e => e.target === m && m.remove();
+  m.innerHTML = `<div class="card"><h2>Chỗ ${esc(id)}</h2><p>Tầng ${floorOf(id)} · Trạng thái: <b>${{ free: "Trống", used: "Đang sử dụng", away: "Tạm vắng" }[v.s]}</b>${v.s === "away" ? `<br>Còn ${fmt(v.until - Date.now())} trước khi được giải phóng` : ""}${v.me ? "<br>Đây là chỗ của bạn" : ""}</p>
+ ${v.s === "free" && !S.sess ? `<button type="button" class="btn o" onclick="go('scan','${id}')">Nhận chỗ</button> ` : ""}<button type="button" class="btn g" onclick="this.closest('.modal').remove()">Đóng</button></div>`;
+  document.body.append(m);
+}
+
+function render() {
+  if (!S.user && !["login", "confirm", "expired"].includes(view)) view = "login";
+  if (S.user && view === "login" && S.user.exp > Date.now() && !pendingUser) view = "home";
+  if (S.user && S.user.exp <= Date.now() && !["login", "expired"].includes(view)) {
+    S.user = null;
+    save();
+    view = "expired";
+  }
+  const pub = ["login", "confirm", "expired"].includes(view);
+  const fn = V[view] || V.home;
+  $("#app").innerHTML = (pub ? "" : nav()) + `<div class="wrap">${fn()}</div>`;
+  if (view === "login") {
+    const pw = $("#pw");
+    if (pw) pw.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+    const id = $("#id");
+    if (id) id.addEventListener("keydown", e => { if (e.key === "Enter") $("#pw")?.focus(); });
+  }
+}
+
+view = S.user ? (S.user.exp > Date.now() ? "home" : "expired") : "login";
+render();
+</script>
+</body>
+</html>
